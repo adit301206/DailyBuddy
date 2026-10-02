@@ -1,3 +1,14 @@
-from django.shortcuts import render
+from rest_framework import viewsets
 
-# Create your views here.
+from .models import Habit, HabitLog
+from .serializers import HabitLogSerializer, HabitSerializer
+
+
+class HabitViewSet(viewsets.ModelViewSet):
+    queryset = Habit.objects.all()
+    serializer_class = HabitSerializer
+
+
+class HabitLogViewSet(viewsets.ModelViewSet):
+    queryset = HabitLog.objects.all()
+    serializer_class = HabitLogSerializer

@@ -23,4 +23,5 @@ urlpatterns = [
     path("api/", include("commitments.urls")),
     path("api/", include("habits.urls")),
     path("api/", include("reminders.urls")),
+    path("api/", include("core.urls")),
 ]

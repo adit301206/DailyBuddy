@@ -46,10 +46,13 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
   const isCompleted = task.completed;
   const todayStr = getLocalTodayStr();
-  const isOverdue = !isCompleted && task.due_date && task.due_date < todayStr;
+  const isOverdue = !isCompleted && !!task.due_date && task.due_date < todayStr;
   const dueFormatted = formatHumanDate(task.due_date);
   const timeFormatted = formatTimeString(task.due_time);
-  const categoryEmoji = getCategoryEmoji(task.category_name);
+
+  // Category with neutral fallback
+  const categoryDisplay = task.category_name || 'Personal';
+  const categoryEmoji = getCategoryEmoji(categoryDisplay);
 
   const getPriorityBadge = (priority: string) => {
     const p = (priority || 'MEDIUM').toUpperCase();
@@ -61,9 +64,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
             color: 'var(--color-danger)',
             borderColor: 'var(--color-danger)',
           }}
-          className="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider border border-current/20 uppercase shrink-0 select-none"
+          className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-current/20 uppercase shrink-0 select-none"
         >
-          High
+          HIGH
         </span>
       );
     }
@@ -77,7 +80,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           }}
           className="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider border border-current/20 uppercase shrink-0 select-none"
         >
-          Med
+          MED
         </span>
       );
     }
@@ -90,7 +93,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         }}
         className="px-2 py-0.5 rounded text-[10px] font-medium tracking-wider border uppercase shrink-0 select-none"
       >
-        Low
+        LOW
       </span>
     );
   };
@@ -100,8 +103,8 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       className={cn(
         'group relative flex items-start sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl border transition-all duration-150',
         isCompleted
-          ? 'bg-[var(--color-surface)]/60 border-[var(--color-border)]/60 opacity-75 hover:opacity-100'
-          : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:border-[var(--color-primary)]/40 hover:shadow-2xs'
+          ? 'bg-[var(--color-surface)]/70 border-[var(--color-border)]/60 opacity-80 hover:opacity-100'
+          : 'bg-[var(--color-surface)] border-[var(--color-border)] hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-surface-secondary)]/20'
       )}
     >
       {/* Left: Completion Button & Content */}
@@ -111,7 +114,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           type="button"
           role="checkbox"
           aria-checked={isCompleted}
-          aria-label={isCompleted ? `Mark '${task.title}' as uncompleted` : `Mark '${task.title}' as completed`}
+          aria-label={isCompleted ? `Mark '${task.title}' as incomplete` : `Mark '${task.title}' as complete`}
           onClick={() => onToggleComplete(task)}
           className={cn(
             'mt-0.5 sm:mt-0 w-5.5 h-5.5 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]',
@@ -150,25 +153,28 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           )}
 
           {/* Metadata Row: Category, Due Date/Time */}
-          <div className="flex items-center gap-2 flex-wrap text-xs text-[var(--color-text-secondary)] pt-0.5">
+          <div className="flex items-center gap-2.5 flex-wrap text-xs text-[var(--color-text-secondary)] pt-0.5">
             {/* Category Tag */}
-            {task.category_name && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-surface-secondary)] border border-[var(--color-border)] text-[11px] font-medium text-[var(--color-text)]">
-                {categoryEmoji && <span className="text-xs">{categoryEmoji}</span>}
-                <span>{task.category_name}</span>
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-surface-secondary)] border border-[var(--color-border)] text-[11px] font-medium text-[var(--color-text)]">
+              {categoryEmoji && <span className="text-xs">{categoryEmoji}</span>}
+              <span>{categoryDisplay}</span>
+            </span>
 
-            {/* Due Date & Time */}
-            {task.due_date ? (
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px]',
-                  isOverdue
-                    ? 'text-[var(--color-danger)] font-medium bg-[var(--color-danger-soft)]'
-                    : 'text-[var(--color-text-secondary)]'
+            {/* Due Date & Time / Overdue Badge */}
+            {isOverdue ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium text-[var(--color-danger)] bg-[var(--color-danger-soft)]">
+                <span>⚠ Overdue</span>
+                <span>·</span>
+                <span>{dueFormatted}</span>
+                {timeFormatted && (
+                  <>
+                    <span>·</span>
+                    <span>{timeFormatted}</span>
+                  </>
                 )}
-              >
+              </span>
+            ) : task.due_date ? (
+              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--color-text-secondary)]">
                 <Calendar className="w-3 h-3 shrink-0" />
                 <span>{dueFormatted}</span>
                 {timeFormatted && (
@@ -178,14 +184,17 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                     <span>{timeFormatted}</span>
                   </>
                 )}
-                {isOverdue && <span className="font-semibold text-[10px] uppercase ml-0.5">(Overdue)</span>}
               </span>
             ) : timeFormatted ? (
               <span className="inline-flex items-center gap-1 text-[11px] text-[var(--color-text-secondary)]">
                 <Clock className="w-3 h-3 shrink-0" />
                 <span>{timeFormatted}</span>
               </span>
-            ) : null}
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--color-text-secondary)]/70">
+                <span>No date</span>
+              </span>
+            )}
           </div>
         </div>
       </div>

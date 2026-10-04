@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { Category, CreateTaskInput, Task, TaskPriority } from '../../types/task';
 import { Button } from '../ui/Button';
 import { getCategoryEmoji, getLocalTodayStr } from '../../lib/formatters';
@@ -28,8 +28,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [dueTime, setDueTime] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync initial task values on open / change
+  // Sync initial task values on open / change & auto-focus title
   useEffect(() => {
     if (isOpen) {
       if (initialTask) {
@@ -50,6 +51,12 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       }
       setError(null);
       setSubmitting(false);
+
+      // Focus title on open
+      const focusTimer = setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(focusTimer);
     }
   }, [isOpen, initialTask]);
 
@@ -155,9 +162,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 Title <span className="text-[var(--color-danger)]">*</span>
               </label>
               <input
+                ref={titleInputRef}
                 id="task-title"
                 type="text"
-                autoFocus
                 value={title}
                 onChange={(e) => {
                   setTitle(e.target.value);

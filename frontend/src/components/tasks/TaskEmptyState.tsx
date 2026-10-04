@@ -15,19 +15,19 @@ export const TaskEmptyState: React.FC<TaskEmptyStateProps> = ({
     today: {
       icon: CalendarCheck,
       title: 'No tasks for today.',
-      description: "You're clear for now. Enjoy the breathing room or add a task.",
-      actionText: '+ Add Task for Today',
+      description: "You're clear for now.",
+      actionText: '+ New Task',
     },
     upcoming: {
       icon: Clock,
       title: 'No upcoming tasks.',
-      description: 'You have no future scheduled tasks at the moment.',
-      actionText: '+ Schedule a Task',
+      description: 'Nothing scheduled ahead yet.',
+      actionText: '+ New Task',
     },
     completed: {
       icon: CheckCircle2,
       title: 'No completed tasks yet.',
-      description: 'Tasks you finish will be organized and preserved here.',
+      description: "Finish a task and it'll appear here.",
       actionText: undefined,
     },
   }[filter];

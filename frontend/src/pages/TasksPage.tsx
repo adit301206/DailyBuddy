@@ -77,7 +77,7 @@ export const TasksPage: React.FC = () => {
         // Upcoming: active tasks whose due_date is later than today
         upcomingCount++;
       }
-      // Overdue active tasks (due_date < todayStr) are not counted as Today or Upcoming
+      // Overdue active tasks (due_date < todayStr) are not counted in Today or Upcoming tab
     });
 
     return {
@@ -87,6 +87,7 @@ export const TasksPage: React.FC = () => {
     };
   }, [tasks, todayStr]);
 
+  // Group 1: Overdue active tasks (due_date < today)
   const overdueTasks = useMemo(() => {
     return tasks
       .filter((t) => !t.completed && t.due_date && t.due_date < todayStr)
@@ -106,27 +107,32 @@ export const TasksPage: React.FC = () => {
       });
   }, [tasks, todayStr]);
 
-  const todayTasks = useMemo(() => {
+  // Group 2: Due today active tasks (due_date === today)
+  const dueTodayTasks = useMemo(() => {
     return tasks
-      .filter((t) => !t.completed && (!t.due_date || t.due_date === todayStr))
+      .filter((t) => !t.completed && t.due_date === todayStr)
       .sort((a, b) => {
-        // Due today tasks first, then tasks with no due date
-        const aHasDate = !!a.due_date;
-        const bHasDate = !!b.due_date;
-        if (aHasDate && !bHasDate) return -1;
-        if (!aHasDate && bHasDate) return 1;
-
-        // Due time
+        // 1. Due time ascending
         const timeA = a.due_time || '23:59:59';
         const timeB = b.due_time || '23:59:59';
         const timeDiff = timeA.localeCompare(timeB);
         if (timeDiff !== 0) return timeDiff;
 
-        // Created time
+        // 2. Created time
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       });
   }, [tasks, todayStr]);
 
+  // Group 3: No date active tasks (!due_date)
+  const noDateTasks = useMemo(() => {
+    return tasks
+      .filter((t) => !t.completed && !t.due_date)
+      .sort((a, b) => {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+  }, [tasks]);
+
+  // Upcoming active tasks (due_date > today)
   const upcomingTasks = useMemo(() => {
     return tasks
       .filter((t) => !t.completed && t.due_date && t.due_date > todayStr)
@@ -146,11 +152,11 @@ export const TasksPage: React.FC = () => {
       });
   }, [tasks, todayStr]);
 
+  // Completed tasks (all completed tasks, sorted most recent update/create first)
   const completedTasks = useMemo(() => {
     return tasks
       .filter((t) => t.completed)
       .sort((a, b) => {
-        // Sort completed by most recent updated or created
         return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
       });
   }, [tasks]);
@@ -163,6 +169,7 @@ export const TasksPage: React.FC = () => {
     setTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, completed: nextCompleted } : t))
     );
+    showToast('success', nextCompleted ? 'Task completed' : 'Task reopened');
 
     // 2. Send PATCH request to backend
     try {
@@ -174,7 +181,7 @@ export const TasksPage: React.FC = () => {
       setTasks((prev) =>
         prev.map((t) => (t.id === task.id ? { ...t, completed: !nextCompleted } : t))
       );
-      showToast('error', 'Failed to update task. Check your network or backend server.');
+      showToast('error', "Couldn't update task");
     }
   };
 
@@ -196,12 +203,12 @@ export const TasksPage: React.FC = () => {
       // Edit existing
       const updated = await updateTask(editingTask.id, data);
       setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updated : t)));
-      showToast('success', 'Task updated successfully.');
+      showToast('success', 'Task updated');
     } else {
       // Create new
       const created = await createTask(data);
       setTasks((prev) => [created, ...prev]);
-      showToast('success', 'Task created successfully.');
+      showToast('success', 'Task created');
     }
   };
 
@@ -217,10 +224,10 @@ export const TasksPage: React.FC = () => {
     try {
       await deleteTask(deletingTask.id);
       setTasks((prev) => prev.filter((t) => t.id !== deletingTask.id));
-      showToast('success', 'Task deleted.');
+      showToast('success', 'Task deleted');
       setDeletingTask(null);
     } catch (err) {
-      showToast('error', 'Failed to delete task.');
+      showToast('error', "Couldn't delete task");
     } finally {
       setIsDeleting(false);
     }
@@ -294,25 +301,25 @@ export const TasksPage: React.FC = () => {
 
         {!loading && !error && activeFilter === 'today' && (
           <>
-            {overdueTasks.length === 0 && todayTasks.length === 0 ? (
+            {overdueTasks.length === 0 && dueTodayTasks.length === 0 && noDateTasks.length === 0 ? (
               <TaskEmptyState
                 filter="today"
                 onCreateTask={handleOpenCreate}
               />
             ) : (
               <div className="space-y-6">
-                {/* Overdue Section */}
+                {/* OVERDUE Section */}
                 {overdueTasks.length > 0 && (
                   <section aria-label="Overdue Tasks" className="space-y-3">
-                    <div className="flex items-center justify-between px-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[var(--color-danger)]" />
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-danger)]">
-                          Overdue ({overdueTasks.length})
-                        </h3>
-                      </div>
+                    <div className="flex items-center justify-between pb-1.5 border-b border-[var(--color-border)]/60">
+                      <h3 className="text-xs font-bold tracking-wider uppercase text-[var(--color-danger)] flex items-center gap-1.5">
+                        <span>OVERDUE</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-[var(--color-danger-soft)] text-[var(--color-danger)]">
+                          {overdueTasks.length}
+                        </span>
+                      </h3>
                       <span className="text-[11px] text-[var(--color-text-secondary)]">
-                        Past due date
+                        Past due
                       </span>
                     </div>
 
@@ -330,22 +337,20 @@ export const TasksPage: React.FC = () => {
                   </section>
                 )}
 
-                {/* Today & No Due Date Section */}
-                {todayTasks.length > 0 ? (
+                {/* TODAY Section */}
+                {dueTodayTasks.length > 0 && (
                   <section aria-label="Today's Tasks" className="space-y-3">
-                    {overdueTasks.length > 0 && (
-                      <div className="flex items-center justify-between px-1 pt-2">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-[var(--color-primary)]" />
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                            Today & No Date ({todayTasks.length})
-                          </h3>
-                        </div>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between pb-1.5 border-b border-[var(--color-border)]/60">
+                      <h3 className="text-xs font-bold tracking-wider uppercase text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                        <span>TODAY</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-[var(--color-surface-secondary)] text-[var(--color-text-secondary)]">
+                          {dueTodayTasks.length}
+                        </span>
+                      </h3>
+                    </div>
 
                     <div className="space-y-2.5">
-                      {todayTasks.map((task) => (
+                      {dueTodayTasks.map((task) => (
                         <TaskItem
                           key={task.id}
                           task={task}
@@ -356,14 +361,32 @@ export const TasksPage: React.FC = () => {
                       ))}
                     </div>
                   </section>
-                ) : (
-                  overdueTasks.length > 0 && (
-                    <div className="py-6 px-4 text-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)]/30 space-y-1">
-                      <p className="text-xs font-medium text-[var(--color-text-secondary)]">
-                        No active tasks due today.
-                      </p>
+                )}
+
+                {/* NO DATE Section */}
+                {noDateTasks.length > 0 && (
+                  <section aria-label="Tasks with No Due Date" className="space-y-3">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-[var(--color-border)]/60">
+                      <h3 className="text-xs font-bold tracking-wider uppercase text-[var(--color-text-secondary)] flex items-center gap-1.5">
+                        <span>NO DATE</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-[var(--color-surface-secondary)] text-[var(--color-text-secondary)]">
+                          {noDateTasks.length}
+                        </span>
+                      </h3>
                     </div>
-                  )
+
+                    <div className="space-y-2.5">
+                      {noDateTasks.map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          onToggleComplete={handleToggleComplete}
+                          onEdit={handleOpenEdit}
+                          onDelete={handleOpenDelete}
+                        />
+                      ))}
+                    </div>
+                  </section>
                 )}
               </div>
             )}

@@ -1,3 +1,4 @@
+import type { Commitment, CommitmentLog, CreateCommitmentInput, UpdateCommitmentInput } from '../types/commitment';
 import type { DashboardData } from '../types/dashboard';
 import type { Category, CreateTaskInput, Task, UpdateTaskInput } from '../types/task';
 
@@ -127,6 +128,206 @@ export async function deleteTask(taskId: number): Promise<void> {
 }
 
 /**
+ * Fetch all commitments from Django backend.
+ */
+export async function getCommitments(): Promise<Commitment[]> {
+  const response = await fetch(`${API_BASE_URL}/commitments/`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load commitments (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new commitment.
+ */
+export async function createCommitment(data: CreateCommitmentInput): Promise<Commitment> {
+  const payload = {
+    ...data,
+    category: data.category || null,
+    target_time: data.target_time || null,
+    active: data.active !== undefined ? data.active : true,
+  };
+
+  const response = await fetch(`${API_BASE_URL}/commitments/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const errJson = await response.json();
+      errorDetail = Object.values(errJson).flat().join(', ');
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail || `Failed to create commitment (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Update an existing commitment (partial update via PATCH).
+ */
+export async function updateCommitment(id: number, data: UpdateCommitmentInput): Promise<Commitment> {
+  const payload: Record<string, unknown> = { ...data };
+  if ('category' in data) {
+    payload.category = data.category || null;
+  }
+  if ('target_time' in data) {
+    payload.target_time = data.target_time || null;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/commitments/${id}/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const errJson = await response.json();
+      errorDetail = Object.values(errJson).flat().join(', ');
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail || `Failed to update commitment (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete an existing commitment.
+ */
+export async function deleteCommitment(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/commitments/${id}/`, {
+    method: 'DELETE',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete commitment (${response.status})`);
+  }
+}
+
+/**
+ * Fetch all commitment logs.
+ */
+export async function getCommitmentLogs(): Promise<CommitmentLog[]> {
+  const response = await fetch(`${API_BASE_URL}/commitment-logs/`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load commitment logs (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new commitment log.
+ */
+export async function createCommitmentLog(data: {
+  commitment: number;
+  date: string;
+  completed?: boolean;
+  completed_at?: string | null;
+}): Promise<CommitmentLog> {
+  const response = await fetch(`${API_BASE_URL}/commitment-logs/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const errJson = await response.json();
+      errorDetail = Object.values(errJson).flat().join(', ');
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail || `Failed to create commitment log (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Update an existing commitment log (partial update via PATCH).
+ */
+export async function updateCommitmentLog(
+  id: number,
+  data: {
+    completed?: boolean;
+    completed_at?: string | null;
+  }
+): Promise<CommitmentLog> {
+  const response = await fetch(`${API_BASE_URL}/commitment-logs/${id}/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const errJson = await response.json();
+      errorDetail = Object.values(errJson).flat().join(', ');
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail || `Failed to update commitment log (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete a commitment log.
+ */
+export async function deleteCommitmentLog(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/commitment-logs/${id}/`, {
+    method: 'DELETE',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete commitment log (${response.status})`);
+  }
+}
+
+/**
  * Fetch the latest dashboard overview from Django backend.
  */
 export async function fetchDashboardData(): Promise<DashboardData> {
@@ -204,4 +405,5 @@ export async function logHabitToday(habitId: number, dateStr: string, completed:
     throw new Error(`Failed to log habit (${response.status})`);
   }
 }
+
 

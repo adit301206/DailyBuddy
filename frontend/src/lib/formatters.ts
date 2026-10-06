@@ -201,3 +201,130 @@ export function getItemIcon(name: string): React.ComponentType<{ className?: str
   return Sparkles;
 }
 
+/**
+ * Returns the Monday Date object for the current week.
+ */
+export function getMondayOfCurrentWeek(d = new Date()): Date {
+  const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = date.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+export interface WeekDayInfo {
+  dateStr: string;
+  dayShort: string;
+  dayInitial: string;
+  dayNumber: number;
+  isToday: boolean;
+  isPast: boolean;
+  isFuture: boolean;
+}
+
+/**
+ * Generates array of 7 days (Monday to Sunday) for the current week.
+ */
+export function getCurrentWeekDays(todayStr = getLocalTodayStr()): WeekDayInfo[] {
+  const now = new Date();
+  const monday = getMondayOfCurrentWeek(now);
+  const days: WeekDayInfo[] = [];
+
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayInitials = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  for (let i = 0; i < 7; i++) {
+    const current = new Date(monday);
+    current.setDate(monday.getDate() + i);
+
+    const year = current.getFullYear();
+    const month = String(current.getMonth() + 1).padStart(2, '0');
+    const day = String(current.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    const isToday = dateStr === todayStr;
+    const isPast = dateStr < todayStr;
+    const isFuture = dateStr > todayStr;
+
+    days.push({
+      dateStr,
+      dayShort: dayNames[i],
+      dayInitial: dayInitials[i],
+      dayNumber: current.getDate(),
+      isToday,
+      isPast,
+      isFuture,
+    });
+  }
+
+  return days;
+}
+
+export interface WeekIntervalInfo {
+  startStr: string;
+  endStr: string;
+  label: string;
+  formattedRange: string;
+  isCurrentWeek: boolean;
+}
+
+/**
+ * Generates past weekly intervals for weekly commitments.
+ */
+export function getRecentWeeklyIntervals(count = 4): WeekIntervalInfo[] {
+  const now = new Date();
+  const currentMonday = getMondayOfCurrentWeek(now);
+  const intervals: WeekIntervalInfo[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const mon = new Date(currentMonday);
+    mon.setDate(currentMonday.getDate() - i * 7);
+
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+
+    const startStr = `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+    const endStr = `${sun.getFullYear()}-${String(sun.getMonth() + 1).padStart(2, '0')}-${String(sun.getDate()).padStart(2, '0')}`;
+
+    let label = '';
+    if (i === 0) {
+      label = 'This Week';
+    } else if (i === 1) {
+      label = 'Last Week';
+    } else {
+      label = `${i} Weeks Ago`;
+    }
+
+    const startFormatted = mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endFormatted = sun.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    intervals.push({
+      startStr,
+      endStr,
+      label,
+      formattedRange: `${startFormatted} – ${endFormatted}`,
+      isCurrentWeek: i === 0,
+    });
+  }
+
+  return intervals;
+}
+
+/**
+ * Formats ISO timestamp or time string for log display.
+ */
+export function formatLogTimestamp(isoStr?: string | null): string {
+  if (!isoStr) return '';
+  try {
+    const date = new Date(isoStr);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return '';
+  }
+}
+

@@ -9,6 +9,7 @@ interface CommitmentItemProps {
   isCompletedToday: boolean;
   currentStreak: number;
   longestStreak: number;
+  onSelect?: (commitment: Commitment) => void;
   onToggleComplete?: (commitment: Commitment) => void;
   onEdit: (commitment: Commitment) => void;
   onToggleActive: (commitment: Commitment) => void;
@@ -20,6 +21,7 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
   isCompletedToday,
   currentStreak,
   longestStreak,
+  onSelect,
   onToggleComplete,
   onEdit,
   onToggleActive,
@@ -63,8 +65,21 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
 
   return (
     <div
+      role={onSelect ? 'button' : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      aria-label={`View details for ${commitment.name}`}
+      onClick={() => onSelect?.(commitment)}
+      onKeyDown={(e) => {
+        if (onSelect && (e.key === 'Enter' || e.key === ' ')) {
+          // If the active element is a nested button, don't trigger row click
+          if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+          e.preventDefault();
+          onSelect(commitment);
+        }
+      }}
       className={cn(
         'group relative flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl border transition-all duration-150',
+        onSelect && 'cursor-pointer hover:shadow-xs',
         !isActive
           ? 'bg-[var(--color-surface)]/60 border-[var(--color-border)]/60 opacity-75 hover:opacity-90'
           : isCompletedToday
@@ -167,7 +182,10 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
             role="checkbox"
             aria-checked={isCompletedToday}
             aria-label={isCompletedToday ? `Mark '${commitment.name}' as incomplete today` : `Mark '${commitment.name}' as completed today`}
-            onClick={() => onToggleComplete(commitment)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleComplete(commitment);
+            }}
             className={cn(
               'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]',
               isCompletedToday
@@ -192,12 +210,15 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
         )}
 
         {/* Action Menu Dropdown */}
-        <div className="relative" ref={menuRef}>
+        <div className="relative" ref={menuRef} onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             aria-label={`Actions for ${commitment.name}`}
             aria-expanded={menuOpen}
-            onClick={() => setMenuOpen(!menuOpen)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen(!menuOpen);
+            }}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-secondary)] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
           >
             <MoreVertical className="w-4 h-4" />
@@ -211,7 +232,8 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMenuOpen(false);
                   onEdit(commitment);
                 }}
@@ -224,7 +246,8 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMenuOpen(false);
                   onToggleActive(commitment);
                 }}
@@ -248,7 +271,8 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setMenuOpen(false);
                   onDelete(commitment);
                 }}
@@ -264,3 +288,4 @@ export const CommitmentItem: React.FC<CommitmentItemProps> = ({
     </div>
   );
 };
+

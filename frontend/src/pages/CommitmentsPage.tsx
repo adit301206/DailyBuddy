@@ -18,6 +18,7 @@ import { CommitmentFilterTabs, type CommitmentFilterType } from '../components/c
 import { CommitmentItem } from '../components/commitments/CommitmentItem';
 import { CommitmentFormModal } from '../components/commitments/CommitmentFormModal';
 import { CommitmentDeleteDialog } from '../components/commitments/CommitmentDeleteDialog';
+import { CommitmentDetailDrawer } from '../components/commitments/CommitmentDetailDrawer';
 import { CommitmentEmptyState } from '../components/commitments/CommitmentEmptyState';
 import { CommitmentSkeleton } from '../components/commitments/CommitmentSkeleton';
 import { Toast, type ToastInfo } from '../components/tasks/Toast';
@@ -35,6 +36,7 @@ export const CommitmentsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Modal and Dialog States
+  const [selectedCommitment, setSelectedCommitment] = useState<Commitment | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingCommitment, setEditingCommitment] = useState<Commitment | null>(null);
   const [deletingCommitment, setDeletingCommitment] = useState<Commitment | null>(null);
@@ -212,6 +214,9 @@ export const CommitmentsPage: React.FC = () => {
       // Edit existing
       const updated = await updateCommitment(editingCommitment.id, data);
       setCommitments((prev) => prev.map((c) => (c.id === editingCommitment.id ? updated : c)));
+      if (selectedCommitment && selectedCommitment.id === editingCommitment.id) {
+        setSelectedCommitment(updated);
+      }
       showToast('success', 'Commitment updated');
     } else {
       // Create new
@@ -234,6 +239,9 @@ export const CommitmentsPage: React.FC = () => {
     try {
       const updated = await updateCommitment(commitment.id, { active: nextActive });
       setCommitments((prev) => prev.map((c) => (c.id === commitment.id ? updated : c)));
+      if (selectedCommitment && selectedCommitment.id === commitment.id) {
+        setSelectedCommitment(updated);
+      }
       showToast('success', nextActive ? 'Commitment reactivated' : 'Commitment deactivated');
       // Refresh dashboard info
       const dash = await fetchDashboardData();
@@ -256,6 +264,9 @@ export const CommitmentsPage: React.FC = () => {
       await deleteCommitment(deletingCommitment.id);
       setCommitments((prev) => prev.filter((c) => c.id !== deletingCommitment.id));
       setLogs((prev) => prev.filter((l) => l.commitment !== deletingCommitment.id));
+      if (selectedCommitment && selectedCommitment.id === deletingCommitment.id) {
+        setSelectedCommitment(null);
+      }
       showToast('success', 'Commitment deleted');
       setDeletingCommitment(null);
     } catch (err) {
@@ -266,6 +277,11 @@ export const CommitmentsPage: React.FC = () => {
   };
 
   const displayedCommitments = activeFilter === 'active' ? activeCommitments : inactiveCommitments;
+
+  // Selected commitment streak values
+  const selectedStreak = selectedCommitment
+    ? streakMap.get(selectedCommitment.id) || { currentStreak: 0, longestStreak: 0 }
+    : { currentStreak: 0, longestStreak: 0 };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
@@ -353,6 +369,7 @@ export const CommitmentsPage: React.FC = () => {
                       isCompletedToday={completedToday}
                       currentStreak={streak.currentStreak}
                       longestStreak={streak.longestStreak}
+                      onSelect={(c) => setSelectedCommitment(c)}
                       onToggleComplete={commitment.active ? handleToggleComplete : undefined}
                       onEdit={handleOpenEdit}
                       onToggleActive={handleToggleActive}
@@ -365,6 +382,26 @@ export const CommitmentsPage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Commitment Detail Drawer */}
+      <CommitmentDetailDrawer
+        isOpen={!!selectedCommitment}
+        commitment={selectedCommitment}
+        logs={logs}
+        currentStreak={selectedStreak.currentStreak}
+        longestStreak={selectedStreak.longestStreak}
+        isCompletedToday={selectedCommitment ? isCompletedToday(selectedCommitment.id) : false}
+        todayStr={todayStr}
+        onClose={() => setSelectedCommitment(null)}
+        onToggleComplete={handleToggleComplete}
+        onEdit={(c) => {
+          handleOpenEdit(c);
+        }}
+        onToggleActive={handleToggleActive}
+        onDelete={(c) => {
+          handleOpenDelete(c);
+        }}
+      />
 
       {/* Create / Edit Modal */}
       <CommitmentFormModal

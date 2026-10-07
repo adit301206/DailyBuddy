@@ -116,6 +116,45 @@ export function formatTimeString(timeStr?: string | null): string {
 }
 
 /**
+ * Formats a reminder's schedule into a human-friendly string (e.g. "Today at 9:00 PM", "Daily at 8:00 AM").
+ */
+export function formatReminderSchedule(
+  dateStr?: string | null,
+  timeStr?: string | null,
+  repeatType: 'ONCE' | 'DAILY' | 'WEEKLY' | string = 'ONCE'
+): string {
+  const formattedTime = formatTimeString(timeStr);
+
+  if (repeatType === 'DAILY') {
+    return formattedTime ? `Daily at ${formattedTime}` : 'Daily';
+  }
+
+  if (repeatType === 'WEEKLY') {
+    if (dateStr) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        const d = new Date(year, month - 1, day);
+        const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+        return formattedTime ? `Weekly on ${weekday}s at ${formattedTime}` : `Weekly on ${weekday}s`;
+      }
+    }
+    return formattedTime ? `Weekly at ${formattedTime}` : 'Weekly';
+  }
+
+  // ONCE or other
+  if (dateStr) {
+    const humanDate = formatHumanDate(dateStr);
+    return formattedTime ? `${humanDate} at ${formattedTime}` : humanDate;
+  }
+
+  return formattedTime ? `At ${formattedTime}` : 'No date set';
+}
+
+
+/**
  * Returns calm, encouraging contextual message based on progress percentage.
  */
 export function getProgressMessage(percentage: number): string {

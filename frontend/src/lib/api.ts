@@ -1,6 +1,7 @@
 import type { Commitment, CommitmentLog, CreateCommitmentInput, UpdateCommitmentInput } from '../types/commitment';
 import type { DashboardData } from '../types/dashboard';
 import type { CreateHabitInput, Habit, HabitLog, UpdateHabitInput } from '../types/habit';
+import type { CreateReminderInput, Reminder, UpdateReminderInput } from '../types/reminder';
 import type { Category, CreateTaskInput, Task, UpdateTaskInput } from '../types/task';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
@@ -602,5 +603,130 @@ export async function deleteHabitLog(id: number): Promise<void> {
     throw new Error(`Failed to delete habit log (${response.status})`);
   }
 }
+
+/**
+ * Fetch all reminders from Django backend.
+ */
+export async function getReminders(): Promise<Reminder[]> {
+  const response = await fetch(`${API_BASE_URL}/reminders/`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load reminders (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetch a single reminder by ID.
+ */
+export async function getReminder(id: number): Promise<Reminder> {
+  const response = await fetch(`${API_BASE_URL}/reminders/${id}/`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load reminder (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a new reminder.
+ */
+export async function createReminder(data: CreateReminderInput): Promise<Reminder> {
+  const payload = {
+    ...data,
+    category: data.category || null,
+    reminder_date: data.reminder_date || null,
+    description: data.description || '',
+    repeat_type: data.repeat_type || 'ONCE',
+    active: data.active !== undefined ? data.active : true,
+  };
+
+  const response = await fetch(`${API_BASE_URL}/reminders/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const errJson = await response.json();
+      errorDetail = Object.values(errJson).flat().join(', ');
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail || `Failed to create reminder (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Update an existing reminder (partial update via PATCH).
+ */
+export async function updateReminder(id: number, data: UpdateReminderInput): Promise<Reminder> {
+  const payload: Record<string, unknown> = { ...data };
+  if ('category' in data) {
+    payload.category = data.category || null;
+  }
+  if ('reminder_date' in data) {
+    payload.reminder_date = data.reminder_date || null;
+  }
+  if ('description' in data) {
+    payload.description = data.description || '';
+  }
+
+  const response = await fetch(`${API_BASE_URL}/reminders/${id}/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    let errorDetail = '';
+    try {
+      const errJson = await response.json();
+      errorDetail = Object.values(errJson).flat().join(', ');
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail || `Failed to update reminder (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete an existing reminder.
+ */
+export async function deleteReminder(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/reminders/${id}/`, {
+    method: 'DELETE',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete reminder (${response.status})`);
+  }
+}
+
 
 

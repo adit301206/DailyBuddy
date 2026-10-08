@@ -285,9 +285,10 @@ export function calculateWeeklyActivityMatrix(
   habits: Habit[],
   commitmentLogs: CommitmentLog[],
   habitLogs: HabitLog[],
-  todayStr = getLocalTodayStr()
+  todayStr = getLocalTodayStr(),
+  weekStart: 'monday' | 'sunday' = 'monday'
 ): WeekDayActivity[] {
-  const weekDays = getCurrentWeekDays(todayStr);
+  const weekDays = getCurrentWeekDays(todayStr, weekStart);
 
   const activeDailyCommitments = commitments.filter(
     (c) => c.active && c.frequency === 'DAILY'

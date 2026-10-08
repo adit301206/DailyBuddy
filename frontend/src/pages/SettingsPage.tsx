@@ -1,30 +1,65 @@
-import React from 'react';
-import { Card } from '../components/ui/Card';
-import { PageTitle, SecondaryText, SectionTitle, Text } from '../components/ui/Typography';
+import React, { useState } from 'react';
+import { PageTitle, SecondaryText } from '../components/ui/Typography';
 import { Badge } from '../components/ui/Badge';
+import { AppearanceSettings } from '../components/settings/AppearanceSettings';
+import { AccentThemeSettings } from '../components/settings/AccentThemeSettings';
+import { PersonalSettings } from '../components/settings/PersonalSettings';
+import { CalendarSettings } from '../components/settings/CalendarSettings';
+import { DashboardPreferencesSettings } from '../components/settings/DashboardPreferencesSettings';
+import { DangerZoneSettings } from '../components/settings/DangerZoneSettings';
+import { AboutSection } from '../components/settings/AboutSection';
+import { Toast, type ToastInfo } from '../components/tasks/Toast';
 import { Settings } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
+  const [toast, setToast] = useState<ToastInfo | null>(null);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({
+      id: String(Date.now()),
+      type,
+      message,
+    });
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2 mb-2">
-          <Badge variant="default" size="sm" icon={<Settings className="w-3 h-3" />}>
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+      {/* 1. Page Header */}
+      <header className="space-y-1 pb-2 border-b border-[var(--color-border)]">
+        <div className="flex items-center gap-2">
+          <Badge variant="default" size="sm" icon={<Settings className="w-3.5 h-3.5" />}>
             Preferences
           </Badge>
         </div>
-        <PageTitle>Settings</PageTitle>
-        <SecondaryText className="text-base">
-          Customize themes, preferences, and notifications.
+        <PageTitle>Settings & Personalization</PageTitle>
+        <SecondaryText className="text-sm">
+          Customize themes, focus layout, calendar week, and personal preferences.
         </SecondaryText>
-      </div>
+      </header>
 
-      <Card className="py-12 px-6 text-center space-y-3">
-        <SectionTitle className="text-lg font-medium">Settings coming next</SectionTitle>
-        <Text style={{ color: 'var(--color-text-secondary)' }} className="max-w-md mx-auto">
-          Your settings will appear here.
-        </Text>
-      </Card>
+      {/* 2. Section 1: Appearance Mode */}
+      <AppearanceSettings />
+
+      {/* 3. Section 2: Accent Theme */}
+      <AccentThemeSettings />
+
+      {/* 4. Section 3: Personal Profile */}
+      <PersonalSettings />
+
+      {/* 5. Section 4: Day & Calendar Week */}
+      <CalendarSettings />
+
+      {/* 6. Section 5: Dashboard Workspace Layout */}
+      <DashboardPreferencesSettings />
+
+      {/* 7. Section 6: Data & Local Settings */}
+      <DangerZoneSettings onNotify={(msg) => showToast('success', msg)} />
+
+      {/* 8. Section 7: About DailyBuddy */}
+      <AboutSection />
+
+      {/* Feedback Toast */}
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { PageTitle, SecondaryText } from '../ui/Typography';
 import { getFormattedTodayDate, getLocalGreeting } from '../../lib/formatters';
 import { IconButton } from '../ui/IconButton';
 import { RotateCw } from 'lucide-react';
+import { usePreferences } from '../../context/PreferencesContext';
 
 interface GreetingHeaderProps {
   apiDate?: string;
@@ -15,7 +16,11 @@ export const GreetingHeader: React.FC<GreetingHeaderProps> = ({
   isRefreshing,
   onRefresh,
 }) => {
-  const greeting = getLocalGreeting('Adit');
+  const { preferences } = usePreferences();
+  const greeting = getLocalGreeting(
+    preferences.displayName || 'Adit',
+    preferences.showGreetingEmoji
+  );
   const formattedDate = getFormattedTodayDate(apiDate);
 
   return (

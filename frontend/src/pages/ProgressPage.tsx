@@ -34,8 +34,10 @@ import { ProgressEmptyState } from '../components/progress/ProgressEmptyState';
 import { Button } from '../components/ui/Button';
 import { SecondaryText, SectionTitle } from '../components/ui/Typography';
 import { AlertCircle, RotateCw } from 'lucide-react';
+import { usePreferences } from '../context/PreferencesContext';
 
 export const ProgressPage: React.FC = () => {
+  const { preferences } = usePreferences();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -146,9 +148,10 @@ export const ProgressPage: React.FC = () => {
         habits,
         commitmentLogs,
         habitLogs,
-        apiDate
+        apiDate,
+        preferences.weekStart
       ),
-    [tasks, commitments, habits, commitmentLogs, habitLogs, apiDate]
+    [tasks, commitments, habits, commitmentLogs, habitLogs, apiDate, preferences.weekStart]
   );
 
   const streakItems = useMemo(

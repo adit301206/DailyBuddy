@@ -27,15 +27,16 @@ export function getLocalTodayStr(): string {
 /**
  * Returns a time-appropriate greeting based on local browser time.
  */
-export function getLocalGreeting(name = 'Adit'): string {
+export function getLocalGreeting(name = 'Adit', showEmoji = true): string {
   const hour = new Date().getHours();
+  const emoji = showEmoji ? ' 👋' : '';
   if (hour >= 5 && hour < 12) {
-    return `Good morning, ${name} 👋`;
+    return `Good morning, ${name}${emoji}`;
   }
   if (hour >= 12 && hour < 17) {
-    return `Good afternoon, ${name} 👋`;
+    return `Good afternoon, ${name}${emoji}`;
   }
-  return `Good evening, ${name} 👋`;
+  return `Good evening, ${name}${emoji}`;
 }
 
 /**
@@ -241,14 +242,25 @@ export function getItemIcon(name: string): React.ComponentType<{ className?: str
 }
 
 /**
- * Returns the Monday Date object for the current week.
+ * Returns the start Date object for the current week based on preference (Monday or Sunday).
  */
-export function getMondayOfCurrentWeek(d = new Date()): Date {
+export function getStartOfCurrentWeek(d = new Date(), weekStart: 'monday' | 'sunday' = 'monday'): Date {
   const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const day = date.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
+  if (weekStart === 'sunday') {
+    date.setDate(date.getDate() - day);
+  } else {
+    const diff = day === 0 ? -6 : 1 - day;
+    date.setDate(date.getDate() + diff);
+  }
   return date;
+}
+
+/**
+ * Returns the Monday Date object for the current week (legacy compatibility).
+ */
+export function getMondayOfCurrentWeek(d = new Date()): Date {
+  return getStartOfCurrentWeek(d, 'monday');
 }
 
 export interface WeekDayInfo {
@@ -262,19 +274,28 @@ export interface WeekDayInfo {
 }
 
 /**
- * Generates array of 7 days (Monday to Sunday) for the current week.
+ * Generates array of 7 days for the current week according to weekStart preference.
  */
-export function getCurrentWeekDays(todayStr = getLocalTodayStr()): WeekDayInfo[] {
+export function getCurrentWeekDays(
+  todayStr = getLocalTodayStr(),
+  weekStart: 'monday' | 'sunday' = 'monday'
+): WeekDayInfo[] {
   const now = new Date();
-  const monday = getMondayOfCurrentWeek(now);
+  const weekStartDay = getStartOfCurrentWeek(now, weekStart);
   const days: WeekDayInfo[] = [];
 
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const dayInitials = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const dayNamesMon = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayInitialsMon = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+  const dayNamesSun = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayInitialsSun = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  const dayNames = weekStart === 'sunday' ? dayNamesSun : dayNamesMon;
+  const dayInitials = weekStart === 'sunday' ? dayInitialsSun : dayInitialsMon;
 
   for (let i = 0; i < 7; i++) {
-    const current = new Date(monday);
-    current.setDate(monday.getDate() + i);
+    const current = new Date(weekStartDay);
+    current.setDate(weekStartDay.getDate() + i);
 
     const year = current.getFullYear();
     const month = String(current.getMonth() + 1).padStart(2, '0');

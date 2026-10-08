@@ -21,9 +21,13 @@ import { ActiveStreaksCard } from '../components/dashboard/ActiveStreaksCard';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { SecondaryText, SectionTitle } from '../components/ui/Typography';
-import { AlertCircle, RotateCw } from 'lucide-react';
+import { AlertCircle, RotateCw, Settings } from 'lucide-react';
+import { usePreferences } from '../context/PreferencesContext';
+import { useNavigate } from 'react-router-dom';
 
 export const DashboardPage: React.FC = () => {
+  const { preferences } = usePreferences();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -263,38 +267,92 @@ export const DashboardPage: React.FC = () => {
       {/* 2. Today's Progress Bar Overview */}
       <ProgressOverview progress={data.progress} />
 
-      {/* 3. Responsive Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (Primary): Commitments & Tasks */}
-        <div className="lg:col-span-7 space-y-6">
-          <CommitmentsCard
-            commitments={data.commitments}
-            onToggleCommitment={handleToggleCommitment}
-          />
+      {/* 3. Responsive Main Grid based on user preferences */}
+      {(() => {
+        const showCommitments = preferences.dashboardSections.commitments;
+        const showTasks = preferences.dashboardSections.tasks;
+        const showHabits = preferences.dashboardSections.habits;
+        const showActiveStreaks = preferences.dashboardSections.activeStreaks;
+        const showReminders = preferences.dashboardSections.reminders;
 
-          <TasksCard
-            tasks={data.tasks}
-            onToggleTask={handleToggleTask}
-          />
-        </div>
+        const hasLeftItems = showCommitments || showTasks;
+        const hasRightItems = showHabits || showActiveStreaks || showReminders;
 
-        {/* Right Column (Secondary): Habits, Active Streaks & Upcoming Reminders */}
-        <div className="lg:col-span-5 space-y-6">
-          <HabitsCard
-            habits={data.habits}
-            onToggleHabit={handleToggleHabit}
-          />
+        if (!hasLeftItems && !hasRightItems) {
+          return (
+            <Card className="py-12 px-6 text-center space-y-3">
+              <SectionTitle className="text-base font-semibold">
+                All Dashboard Sections Hidden
+              </SectionTitle>
+              <SecondaryText className="text-sm max-w-sm mx-auto">
+                You've customized your dashboard to hide all cards. You can re-enable sections anytime in Settings.
+              </SecondaryText>
+              <div className="pt-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Settings className="w-4 h-4 text-[var(--color-primary)]" />}
+                  onClick={() => navigate('/settings')}
+                >
+                  Manage Dashboard Settings
+                </Button>
+              </div>
+            </Card>
+          );
+        }
 
-          <ActiveStreaksCard
-            commitments={data.commitments}
-            habits={data.habits}
-          />
+        // Layout sizing: If only one column has items, make it full-width
+        const leftSpanClass = hasRightItems ? 'lg:col-span-7' : 'lg:col-span-12';
+        const rightSpanClass = hasLeftItems ? 'lg:col-span-5' : 'lg:col-span-12';
 
-          <RemindersCard
-            reminders={data.upcoming_reminders}
-          />
-        </div>
-      </div>
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column (Primary): Commitments & Tasks */}
+            {hasLeftItems && (
+              <div className={`${leftSpanClass} space-y-6`}>
+                {showCommitments && (
+                  <CommitmentsCard
+                    commitments={data.commitments}
+                    onToggleCommitment={handleToggleCommitment}
+                  />
+                )}
+
+                {showTasks && (
+                  <TasksCard
+                    tasks={data.tasks}
+                    onToggleTask={handleToggleTask}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Right Column (Secondary): Habits, Active Streaks & Upcoming Reminders */}
+            {hasRightItems && (
+              <div className={`${rightSpanClass} space-y-6`}>
+                {showHabits && (
+                  <HabitsCard
+                    habits={data.habits}
+                    onToggleHabit={handleToggleHabit}
+                  />
+                )}
+
+                {showActiveStreaks && (
+                  <ActiveStreaksCard
+                    commitments={data.commitments}
+                    habits={data.habits}
+                  />
+                )}
+
+                {showReminders && (
+                  <RemindersCard
+                    reminders={data.upcoming_reminders}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };

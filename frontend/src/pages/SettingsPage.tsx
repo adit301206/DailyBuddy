@@ -8,6 +8,7 @@ import { CalendarSettings } from '../components/settings/CalendarSettings';
 import { DashboardPreferencesSettings } from '../components/settings/DashboardPreferencesSettings';
 import { DangerZoneSettings } from '../components/settings/DangerZoneSettings';
 import { AboutSection } from '../components/settings/AboutSection';
+import { AccountSettings } from '../components/settings/AccountSettings';
 import { Toast, type ToastInfo } from '../components/tasks/Toast';
 import { Settings } from 'lucide-react';
 
@@ -55,7 +56,10 @@ export const SettingsPage: React.FC = () => {
       {/* 7. Section 6: Data & Local Settings */}
       <DangerZoneSettings onNotify={(msg) => showToast('success', msg)} />
 
-      {/* 8. Section 7: About DailyBuddy */}
+      {/* 8. Section 7: Owner Account */}
+      <AccountSettings />
+
+      {/* 9. Section 8: About DailyBuddy */}
       <AboutSection />
 
       {/* Feedback Toast */}

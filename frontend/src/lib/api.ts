@@ -1,3 +1,4 @@
+import type { AuthResponse, AuthUser, LoginCredentials } from '../types/auth';
 import type { Commitment, CommitmentLog, CreateCommitmentInput, UpdateCommitmentInput } from '../types/commitment';
 import type { DashboardData } from '../types/dashboard';
 import type { CreateHabitInput, Habit, HabitLog, UpdateHabitInput } from '../types/habit';
@@ -5,12 +6,143 @@ import type { CreateReminderInput, Reminder, UpdateReminderInput } from '../type
 import type { Category, CreateTaskInput, Task, UpdateTaskInput } from '../types/task';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
+export const STORAGE_KEY_AUTH_TOKEN = 'dailybuddy_auth_token';
+
+let onUnauthorizedCallback: (() => void) | null = null;
+
+export function setOnUnauthorizedCallback(cb: (() => void) | null) {
+  onUnauthorizedCallback = cb;
+}
+
+export function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY_AUTH_TOKEN);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredToken(token: string | null) {
+  try {
+    if (token) {
+      localStorage.setItem(STORAGE_KEY_AUTH_TOKEN, token);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_AUTH_TOKEN);
+    }
+  } catch {
+    // ignore storage write errors
+  }
+}
+
+/**
+ * Centrally injected auth fetch wrapper.
+ * Attaches DRF Token header and intercepts 401 Unauthorized responses.
+ */
+export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getStoredToken();
+  const headers = new Headers(options.headers || {});
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Token ${token}`);
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  if (response.status === 401) {
+    // If not calling login itself, clear invalid token and notify AuthContext
+    if (!url.includes('/auth/login/')) {
+      setStoredToken(null);
+      if (onUnauthorizedCallback) {
+        onUnauthorizedCallback();
+      }
+    }
+  }
+
+  return response;
+}
+
+/* =========================================================================
+   Authentication API
+   ========================================================================= */
+
+/**
+ * Authenticate owner with credentials and obtain DRF token.
+ */
+export async function loginOwner(credentials: LoginCredentials): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/login/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!response.ok) {
+    let errorDetail = 'Invalid username or password.';
+    try {
+      const errJson = await response.json();
+      if (errJson.detail) {
+        errorDetail = errJson.detail;
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(errorDetail);
+  }
+
+  const data: AuthResponse = await response.json();
+  setStoredToken(data.token);
+  return data;
+}
+
+/**
+ * Fetch current authenticated user info.
+ */
+export async function getMe(): Promise<AuthUser> {
+  const response = await authFetch(`${API_BASE_URL}/auth/me/`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to verify session (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Revoke owner token on the backend and clear local token.
+ */
+export async function logoutOwner(): Promise<void> {
+  try {
+    await authFetch(`${API_BASE_URL}/auth/logout/`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+  } catch {
+    // ignore network errors on logout
+  } finally {
+    setStoredToken(null);
+  }
+}
+
+/* =========================================================================
+   Categories & Tasks API
+   ========================================================================= */
 
 /**
  * Fetch all categories from Django backend.
  */
 export async function getCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_BASE_URL}/categories/`, {
+  const response = await authFetch(`${API_BASE_URL}/categories/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -27,7 +159,7 @@ export async function getCategories(): Promise<Category[]> {
  * Fetch all tasks from Django backend.
  */
 export async function getTasks(): Promise<Task[]> {
-  const response = await fetch(`${API_BASE_URL}/tasks/`, {
+  const response = await authFetch(`${API_BASE_URL}/tasks/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -52,7 +184,7 @@ export async function createTask(data: CreateTaskInput): Promise<Task> {
     description: data.description || '',
   };
 
-  const response = await fetch(`${API_BASE_URL}/tasks/`, {
+  const response = await authFetch(`${API_BASE_URL}/tasks/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -90,7 +222,7 @@ export async function updateTask(taskId: number, data: UpdateTaskInput): Promise
     payload.due_time = data.due_time || null;
   }
 
-  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/`, {
+  const response = await authFetch(`${API_BASE_URL}/tasks/${taskId}/`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -117,7 +249,7 @@ export async function updateTask(taskId: number, data: UpdateTaskInput): Promise
  * Delete an existing task.
  */
 export async function deleteTask(taskId: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/`, {
+  const response = await authFetch(`${API_BASE_URL}/tasks/${taskId}/`, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json',
@@ -129,11 +261,15 @@ export async function deleteTask(taskId: number): Promise<void> {
   }
 }
 
+/* =========================================================================
+   Commitments API
+   ========================================================================= */
+
 /**
  * Fetch all commitments from Django backend.
  */
 export async function getCommitments(): Promise<Commitment[]> {
-  const response = await fetch(`${API_BASE_URL}/commitments/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitments/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -157,7 +293,7 @@ export async function createCommitment(data: CreateCommitmentInput): Promise<Com
     active: data.active !== undefined ? data.active : true,
   };
 
-  const response = await fetch(`${API_BASE_URL}/commitments/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitments/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -192,7 +328,7 @@ export async function updateCommitment(id: number, data: UpdateCommitmentInput):
     payload.target_time = data.target_time || null;
   }
 
-  const response = await fetch(`${API_BASE_URL}/commitments/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitments/${id}/`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -219,7 +355,7 @@ export async function updateCommitment(id: number, data: UpdateCommitmentInput):
  * Delete an existing commitment.
  */
 export async function deleteCommitment(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/commitments/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitments/${id}/`, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json',
@@ -235,7 +371,7 @@ export async function deleteCommitment(id: number): Promise<void> {
  * Fetch all commitment logs.
  */
 export async function getCommitmentLogs(): Promise<CommitmentLog[]> {
-  const response = await fetch(`${API_BASE_URL}/commitment-logs/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitment-logs/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -257,7 +393,7 @@ export async function createCommitmentLog(data: {
   completed?: boolean;
   completed_at?: string | null;
 }): Promise<CommitmentLog> {
-  const response = await fetch(`${API_BASE_URL}/commitment-logs/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitment-logs/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -290,7 +426,7 @@ export async function updateCommitmentLog(
     completed_at?: string | null;
   }
 ): Promise<CommitmentLog> {
-  const response = await fetch(`${API_BASE_URL}/commitment-logs/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitment-logs/${id}/`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -317,7 +453,7 @@ export async function updateCommitmentLog(
  * Delete a commitment log.
  */
 export async function deleteCommitmentLog(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/commitment-logs/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitment-logs/${id}/`, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json',
@@ -330,45 +466,10 @@ export async function deleteCommitmentLog(id: number): Promise<void> {
 }
 
 /**
- * Fetch the latest dashboard overview from Django backend.
- */
-export async function fetchDashboardData(): Promise<DashboardData> {
-  const response = await fetch(`${API_BASE_URL}/dashboard/`, {
-    headers: {
-      'Accept': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to load dashboard data (${response.status} ${response.statusText})`);
-  }
-
-  return response.json();
-}
-
-/**
- * Toggle task completion status.
- */
-export async function toggleTaskCompletion(taskId: number, completed: boolean): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify({ completed }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update task (${response.status})`);
-  }
-}
-
-/**
  * Toggle commitment completion for today.
  */
 export async function logCommitmentToday(commitmentId: number, dateStr: string, completed: boolean = true): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/commitment-logs/`, {
+  const response = await authFetch(`${API_BASE_URL}/commitment-logs/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -386,33 +487,15 @@ export async function logCommitmentToday(commitmentId: number, dateStr: string, 
   }
 }
 
-/**
- * Toggle habit completion for today.
- */
-export async function logHabitToday(habitId: number, dateStr: string, completed: boolean = true): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/habit-logs/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify({
-      habit: habitId,
-      date: dateStr,
-      completed,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to log habit (${response.status})`);
-  }
-}
+/* =========================================================================
+   Habits API
+   ========================================================================= */
 
 /**
  * Fetch all habits from Django backend.
  */
 export async function getHabits(): Promise<Habit[]> {
-  const response = await fetch(`${API_BASE_URL}/habits/`, {
+  const response = await authFetch(`${API_BASE_URL}/habits/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -435,7 +518,7 @@ export async function createHabit(data: CreateHabitInput): Promise<Habit> {
     active: data.active !== undefined ? data.active : true,
   };
 
-  const response = await fetch(`${API_BASE_URL}/habits/`, {
+  const response = await authFetch(`${API_BASE_URL}/habits/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -467,7 +550,7 @@ export async function updateHabit(id: number, data: UpdateHabitInput): Promise<H
     payload.category = data.category || null;
   }
 
-  const response = await fetch(`${API_BASE_URL}/habits/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/habits/${id}/`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -494,7 +577,7 @@ export async function updateHabit(id: number, data: UpdateHabitInput): Promise<H
  * Delete an existing habit.
  */
 export async function deleteHabit(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/habits/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/habits/${id}/`, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json',
@@ -510,7 +593,7 @@ export async function deleteHabit(id: number): Promise<void> {
  * Fetch all habit logs.
  */
 export async function getHabitLogs(): Promise<HabitLog[]> {
-  const response = await fetch(`${API_BASE_URL}/habit-logs/`, {
+  const response = await authFetch(`${API_BASE_URL}/habit-logs/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -532,7 +615,7 @@ export async function createHabitLog(data: {
   completed?: boolean;
   completed_at?: string | null;
 }): Promise<HabitLog> {
-  const response = await fetch(`${API_BASE_URL}/habit-logs/`, {
+  const response = await authFetch(`${API_BASE_URL}/habit-logs/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -565,7 +648,7 @@ export async function updateHabitLog(
     completed_at?: string | null;
   }
 ): Promise<HabitLog> {
-  const response = await fetch(`${API_BASE_URL}/habit-logs/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/habit-logs/${id}/`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -592,7 +675,7 @@ export async function updateHabitLog(
  * Delete a habit log.
  */
 export async function deleteHabitLog(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/habit-logs/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/habit-logs/${id}/`, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json',
@@ -605,10 +688,36 @@ export async function deleteHabitLog(id: number): Promise<void> {
 }
 
 /**
+ * Toggle habit completion for today.
+ */
+export async function logHabitToday(habitId: number, dateStr: string, completed: boolean = true): Promise<void> {
+  const response = await authFetch(`${API_BASE_URL}/habit-logs/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      habit: habitId,
+      date: dateStr,
+      completed,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to log habit (${response.status})`);
+  }
+}
+
+/* =========================================================================
+   Reminders API
+   ========================================================================= */
+
+/**
  * Fetch all reminders from Django backend.
  */
 export async function getReminders(): Promise<Reminder[]> {
-  const response = await fetch(`${API_BASE_URL}/reminders/`, {
+  const response = await authFetch(`${API_BASE_URL}/reminders/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -625,7 +734,7 @@ export async function getReminders(): Promise<Reminder[]> {
  * Fetch a single reminder by ID.
  */
 export async function getReminder(id: number): Promise<Reminder> {
-  const response = await fetch(`${API_BASE_URL}/reminders/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/reminders/${id}/`, {
     headers: {
       'Accept': 'application/json',
     },
@@ -651,7 +760,7 @@ export async function createReminder(data: CreateReminderInput): Promise<Reminde
     active: data.active !== undefined ? data.active : true,
   };
 
-  const response = await fetch(`${API_BASE_URL}/reminders/`, {
+  const response = await authFetch(`${API_BASE_URL}/reminders/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -689,7 +798,7 @@ export async function updateReminder(id: number, data: UpdateReminderInput): Pro
     payload.description = data.description || '';
   }
 
-  const response = await fetch(`${API_BASE_URL}/reminders/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/reminders/${id}/`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -716,7 +825,7 @@ export async function updateReminder(id: number, data: UpdateReminderInput): Pro
  * Delete an existing reminder.
  */
 export async function deleteReminder(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/reminders/${id}/`, {
+  const response = await authFetch(`${API_BASE_URL}/reminders/${id}/`, {
     method: 'DELETE',
     headers: {
       'Accept': 'application/json',
@@ -728,5 +837,41 @@ export async function deleteReminder(id: number): Promise<void> {
   }
 }
 
+/* =========================================================================
+   Dashboard & Helpers
+   ========================================================================= */
 
+/**
+ * Fetch the latest dashboard overview from Django backend.
+ */
+export async function fetchDashboardData(): Promise<DashboardData> {
+  const response = await authFetch(`${API_BASE_URL}/dashboard/`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
 
+  if (!response.ok) {
+    throw new Error(`Failed to load dashboard data (${response.status} ${response.statusText})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Toggle task completion status.
+ */
+export async function toggleTaskCompletion(taskId: number, completed: boolean): Promise<void> {
+  const response = await authFetch(`${API_BASE_URL}/tasks/${taskId}/`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ completed }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update task (${response.status})`);
+  }
+}

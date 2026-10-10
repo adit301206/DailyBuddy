@@ -39,3 +39,5 @@ frontend/.vite/
 mobile/.gradle/
 mobile/build/
 mobile/.idea/
+
+backend/.env

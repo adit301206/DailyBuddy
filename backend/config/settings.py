@@ -23,18 +23,51 @@ def parse_bool(val, default=False):
 
 
 # -----------------------------------------------------------------------------
+# Production & Environment Detection
+# -----------------------------------------------------------------------------
+# Detect production based on explicit hosting platforms or environment flags.
+_is_production = (
+    parse_bool(os.environ.get('RENDER'))
+    or os.environ.get('DJANGO_ENV', '').lower() in ('production', 'prod')
+    or os.environ.get('ENVIRONMENT', '').lower() in ('production', 'prod')
+    or (os.environ.get('DJANGO_DEBUG') is not None and not parse_bool(os.environ.get('DJANGO_DEBUG'), default=True))
+)
+
+# Control whether local backend/.env should be loaded:
+# - Disabled automatically in production (_is_production).
+# - Can be explicitly disabled via LOAD_DOTENV=False (without altering _is_production or DEBUG).
+_should_load_dotenv = (
+    not _is_production
+    and parse_bool(os.environ.get('LOAD_DOTENV', 'True'), default=True)
+)
+
+if _should_load_dotenv:
+    _env_file = BASE_DIR / '.env'
+    if _env_file.is_file():
+        try:
+            with open(_env_file, encoding='utf-8') as _f:
+                for _line in _f:
+                    _line = _line.strip()
+                    if _line and not _line.startswith('#') and '=' in _line:
+                        _k, _v = _line.split('=', 1)
+                        os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+        except OSError:
+            pass
+
+
+# -----------------------------------------------------------------------------
 # Security & Debug Settings
 # -----------------------------------------------------------------------------
 
-DEBUG = parse_bool(os.environ.get('DJANGO_DEBUG'), default=True)
+DEBUG = parse_bool(os.environ.get('DJANGO_DEBUG'), default=not _is_production)
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
     if DEBUG:
         SECRET_KEY = 'django-insecure-dev-only-local-secret-key-dailybuddy-74x2aqaiy'
     else:
         raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY environment variable must be set in production when DEBUG is False."
+            "DJANGO_SECRET_KEY (or SECRET_KEY) environment variable must be set in production when DEBUG is False."
         )
 
 # Allowed hosts
@@ -44,7 +77,9 @@ if allowed_hosts_raw:
 elif DEBUG:
     ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 else:
-    ALLOWED_HOSTS = []
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS environment variable must be set in production when DEBUG is False."
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -114,6 +149,10 @@ if DATABASE_URL:
             conn_health_checks=True,
         )
     }
+elif not DEBUG:
+    raise ImproperlyConfigured(
+        "DATABASE_URL environment variable must be set in production when DEBUG is False."
+    )
 else:
     DATABASES = {
         'default': {
